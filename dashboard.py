@@ -2,22 +2,21 @@
 import streamlit as st
 import pandas as pd
 
-# 구글 시트 URL
 sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQG2bOaJ8It23O4ABuCfCXlzRD5SKuzLetxZGMBEfMUwtvIcLpHComi7MWdimDGoLvykbNyJCztKYCU/pub?gid=0&single=true&output=csv"
 
-# 시트에서 3줄 스킵
-df_raw = pd.read_csv(sheet_url, skiprows=3)
+# '구분'이 포함된 행을 헤더로 인식
+df_raw = pd.read_csv(sheet_url, header=2)
 
-# 첫 컬럼명을 '구분'으로 지정
-df_raw.columns.values[0] = "구분"
+# 첫 번째 컬럼명을 명시적으로 '구분'으로 지정
+df_raw.rename(columns={df_raw.columns[0]: "구분"}, inplace=True)
 
-# 열 → 행 전환
+# 열 → 행 구조로 변환
 df = df_raw.melt(id_vars=["구분"], var_name="법인", value_name="금액")
 
-# 연간 인건비 항목만 필터
+# '연간 인건비' 행만 필터링
 df = df[df["구분"].str.contains("연간 인건비", na=False)]
 
-# 대시보드 구성
+# 대시보드 설정
 st.set_page_config(page_title="법인별 인건비 대시보드", layout="wide")
 st.title("🏢 법인별 연간 인건비 모니터링")
 
@@ -34,6 +33,8 @@ if not law_df.empty:
     except:
         st.error("💥 금액 데이터 변환에 실패했습니다.")
 
-    st.bar_chart(df.set_index("법인")["금액"].apply(lambda x: float(str(x).replace(',', '')) if pd.notnull(x) else 0))
+    # 전체 차트 숫자 정리
+    df["금액"] = df["금액"].apply(lambda x: float(str(x).replace(",", "")) if pd.notnull(x) else 0)
+    st.bar_chart(df.set_index("법인")["금액"])
 else:
     st.info("해당 법인의 데이터가 없습니다.")
