@@ -3,37 +3,37 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="법인별 연간 인건비 모니터링", layout="wide")
+st.set_page_config(page_title="법인별 인건비 모니터링", page_icon="🏢")
 
-# 구글 시트 CSV 링크
-url = "https://docs.google.com/spreadsheets/d/1lE58iNt6Fp4uO5zpcP34DMW5Kf5zLV_9O-IZ_bVO4z8/export?format=csv"
+st.title("🏢 법인별 연간 인건비 모니터링")
 
-# 데이터 로드 (헤더가 6행에 있다고 가정)
+# 구글 시트 CSV URL
+url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT7wdfAk4I9QAnEiqNQYYkEVG0ReDRu9tRJpVa1ijSXYTYhrjB0TzEBLqGWy7I4NZhZ1J3rZwLaNgPR/pub?gid=0&single=true&output=csv"
+
+# 데이터 불러오기
 df_raw = pd.read_csv(url, header=6)
 
-# 데이터 전처리
-df = df_raw.copy()
-df.columns = df.columns.str.strip()
-df = df.dropna(how="all")  # 모두 비어있는 행 제거
+# 디버깅용 컬럼명 출력
+st.subheader("데이터 컬럼명")
+st.write(df_raw.columns.tolist())
 
-# 멜트
-df_melted = df.melt(id_vars=["구분"], var_name="법인", value_name="금액")
-df_melted["금액"] = pd.to_numeric(df_melted["금액"], errors="coerce")
-df_melted = df_melted.dropna()
+# melt 사용 전 KeyError 방지를 위해 컬럼명 점검 필요
+try:
+    df_melted = df_raw.melt(id_vars=["구분"], var_name="법인", value_name="금액")
 
-# 셀렉트박스
-selected_corp = st.selectbox("🏢 법인을 선택하세요", df_melted["법인"].unique())
+    # 법인 선택
+    selected_corp = st.selectbox("📌 법인을 선택하세요", df_melted["법인"].unique())
 
-# 선택된 법인의 금액 추출
-amount = df_melted[df_melted["법인"] == selected_corp]["금액"].values[0]
-st.subheader(f"{selected_corp} 연간 인건비")
-st.markdown(f"<h2 style='color:#2E86C1'>{amount:,.0f} 원</h2>", unsafe_allow_html=True)
+    # 선택한 법인의 금액 추출
+    amount = int(df_melted[df_melted["법인"] == selected_corp]["금액"].values[0])
+    st.metric(label=f"{selected_corp} 연간 인건비", value=f"{amount:,.0f} 원")
 
-# 막대그래프
-fig, ax = plt.subplots()
-df_melted_grouped = df_melted.groupby("법인")["금액"].sum().sort_values()
-ax.bar(df_melted_grouped.index, df_melted_grouped.values)
-ax.set_ylabel("금액")
-ax.set_title("법인별 연간 인건비 비교")
-ax.tick_params(axis='x', rotation=45)
-st.pyplot(fig)
+    # 전체 그래프
+    fig, ax = plt.subplots()
+    df_melted.groupby("법인")["금액"].sum().plot(kind="bar", ax=ax)
+    ax.set_ylabel("인건비 (원)")
+    ax.set_title("법인별 연간 인건비")
+    st.pyplot(fig)
+
+except KeyError as e:
+    st.error(f"KeyError: {e}")
