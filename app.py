@@ -3,39 +3,38 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-st.set_page_config(layout="wide")
-st.title("🏢 법인별 월별 HR 지표 대시보드")
+st.set_page_config(page_title="법인별 연간 인건비 대시보드", layout="wide")
 
-# Google Sheet에서 CSV 가져오기
-csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQG2bOaJ8It23O4ABuCfCXlzRD5SKuzLetxZGMBEfMUwtvIcLpHComi7MWdimDGoLvykbNyJCztKYCU/pub?gid=0&single=true&output=csv"
+st.title("📊 법인별 연간 인건비 대시보드")
 
-@st.cache_data(ttl=600)
+# CSV 데이터 불러오기
+sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQG2bOaJ8It23O4ABuCfCXlzRD5SKuzLetxZGMBEfMUwtvIcLpHComi7MWdimDGoLvykbNyJCztKYCU/pub?gid=0&single=true&output=csv"
+
+@st.cache_data
 def load_data():
-    df = pd.read_csv(csv_url)
-    df['날짜 (또는 월)'] = pd.to_datetime(df['날짜 (또는 월)'])
+    df = pd.read_csv(sheet_url)
     return df
 
 df = load_data()
 
-# 원본 보기
-if st.checkbox("📄 원본 데이터 보기"):
+# 데이터 확인
+if st.checkbox("🔍 원본 데이터 보기"):
     st.dataframe(df)
 
-# 인건비 추이
-st.subheader("💸 월별 인건비 추이")
-pivot = df.pivot_table(index='날짜 (또는 월)', columns='법인명', values='인건비 (원)', aggfunc='sum')
-st.line_chart(pivot)
+# 전처리
+df.columns = df.columns.str.strip()
+df['날짜 (또는 월)'] = pd.to_datetime(df['날짜 (또는 월)'])
+df['연도월'] = df['날짜 (또는 월)'].dt.to_period('M')
 
-# 인원수 추이
-st.subheader("👥 월별 인원수 추이")
-pivot_people = df.pivot_table(index='날짜 (또는 월)', columns='법인명', values='인원수 (명)', aggfunc='sum')
-st.line_chart(pivot_people)
+# 시각화
+st.subheader("📈 전체 법인 인건비 추이")
 
-# 입사/퇴사자수 비교
-st.subheader("📈 입사자수 / 퇴사자수 비교")
-latest_month = df['날짜 (또는 월)'].max()
-latest_data = df[df['날짜 (또는 월)'] == latest_month]
+group = df.groupby(['연도월'])['인건비 (원)'].sum().reset_index()
+group['연도월'] = group['연도월'].astype(str)
 
-st.markdown(f"**최근 월:** {latest_month.strftime('%Y-%m')}")
-compare_df = latest_data[['법인명', '입사자수 (명)', '퇴사자수 (명)']].set_index('법인명')
-st.bar_chart(compare_df)
+fig, ax = plt.subplots()
+ax.plot(group['연도월'], group['인건비 (원)'], marker='o')
+plt.xticks(rotation=45)
+plt.title("전체 인건비 추이")
+plt.tight_layout()
+st.pyplot(fig)
