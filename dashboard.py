@@ -1,40 +1,28 @@
-
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
 
-sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQG2bOaJ8It23O4ABuCfCXlzRD5SKuzLetxZGMBEfMUwtvIcLpHComi7MWdimDGoLvykbNyJCztKYCU/pub?gid=0&single=true&output=csv"
+st.set_page_config(page_title="법인별 연간 인건비 모니터링", layout="wide")
 
-# 컬럼명이 실제로 있는 행을 정확히 읽기 (4번째 줄 → header=3)
-df_raw = pd.read_csv(sheet_url, header=3)
+# 구글 시트에서 데이터 불러오기
+url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSwhpW_p7yPwbWdzD8vbxZT5LgOnpuYH7SVRsFGOMbDNDP6bX26xpp0m1RCojXYBKHMcU0lUFk5sNUA/pub?output=csv"
+df_raw = pd.read_csv(url, header=6)
 
-# 첫 컬럼 이름 명시
-df_raw.rename(columns={df_raw.columns[0]: "구분"}, inplace=True)
+# 컬럼명 정리
+df_raw.columns = df_raw.columns.str.strip()
+df_raw = df_raw.rename(columns={df_raw.columns[0]: "구분"})
 
-# 열 → 행 전환
+# 데이터 변형
 df = df_raw.melt(id_vars=["구분"], var_name="법인", value_name="금액")
+df = df[df["구분"] == "연간 인건비 * 연봉기준(복리후생비제외)"]
+df["금액"] = pd.to_numeric(df["금액"], errors="coerce")
 
-# 인건비 항목 필터링
-df = df[df["구분"].str.contains("연간 인건비", na=False)]
-
-# 대시보드 설정
-st.set_page_config(page_title="법인별 인건비 대시보드", layout="wide")
+# UI
 st.title("🏢 법인별 연간 인건비 모니터링")
+selected_law = st.selectbox("📌 법인을 선택하세요", df["법인"].unique())
+law_df = df[df["법인"] == selected_law]
+amount = int(law_df["금액"].values[0])
+st.metric(f"{selected_law} 연간 인건비", f"{amount:,} 원")
 
-# 법인 선택
-selected = st.selectbox("📌 법인을 선택하세요", df["법인"].unique())
-
-# 선택 법인의 금액 출력
-law_df = df[df["법인"] == selected]
-if not law_df.empty:
-    raw_val = str(law_df["금액"].values[0]).replace(",", "").strip()
-    try:
-        amount = int(float(raw_val))
-        st.metric(label=f"{selected} 연간 인건비", value=f"{amount:,} 원")
-    except:
-        st.error("💥 금액 데이터 변환에 실패했습니다.")
-
-    # 전체 차트
-    df["금액"] = df["금액"].apply(lambda x: float(str(x).replace(",", "")) if pd.notnull(x) else 0)
-    st.bar_chart(df.set_index("법인")["금액"])
-else:
-    st.info("해당 법인의 데이터가 없습니다.")
+# 시각화
+st.bar_chart(data=df, x="법인", y="금액")
